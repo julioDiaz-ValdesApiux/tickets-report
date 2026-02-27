@@ -99,31 +99,32 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
   const averageHours = workLogs.length > 0 ? (totalHours / workLogs.length).toFixed(1) : '0';
 
   const exportToCSV = () => {
-    const headers = ['Fecha', 'Ticket', 'Título', 'Usuario', 'Horas', 'Descripción'];
-    const rows = workLogs.map((log) => [
-      log.date,
-      log.ticket_id,
-      log.ticket_title,
-      log.developer_id,
-      log.hours,
-      log.description,
-    ]);
+  const headers = ['Fecha', 'Ticket', 'Título', 'Usuario', 'Horas', 'Descripción'];
+  const rows = workLogs.map((log) => [
+    log.date,
+    log.ticket_id,
+    log.ticket_title,
+    log.developer_name, // <-- CAMBIO AQUÍ: Antes decía developer_id
+    log.hours,
+    log.description,
+  ]);
 
-    const csvContent = [headers, ...rows]
-      .map((row) =>
-        row
-          .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
-          .join(',')
-      )
-      .join('\n');
+  const csvContent = [headers, ...rows]
+    .map((row) =>
+      row
+        .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
+        .join(',')
+    )
+    .join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `reportes_${new Date().getTime()}.csv`);
-    link.click();
-  };
+  // El resto del código de descarga se mantiene igual...
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `reportes_${new Date().getTime()}.csv`);
+  link.click();
+};
 
   const printReport = () => {
     const printWindow = window.open('', '_blank');
