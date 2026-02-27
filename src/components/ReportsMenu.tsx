@@ -31,27 +31,24 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
   }, []);
 
   const loadDevelopers = async () => {
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('id, username'); // Simplificamos la query
+    try {
+      const { data, error } = await supabase
+        .from('users') // Tabla pública de usuarios
+        .select('id, username')
+        .order('username');
 
-    if (error) {
-      console.error('Error detallado:', error.message);
-      return;
+      if (error) throw error;
+      setDevelopers(data || []);
+    } catch (error) {
+      console.error('Error loading developers:', error);
     }
-    
-    console.log('Usuarios encontrados:', data); // Revisa esto en la consola F12
-    setDevelopers(data || []);
-  } catch (error) {
-    console.error('Error loading developers:', error);
-  }
-};
+  };
 
- const loadWorkLogs = async () => {
+  const loadWorkLogs = async () => {
     try {
       setLoading(true);
-      // Ajustamos el select para traer el username directamente desde la tabla users
+      
+      // 1. Iniciamos la query con la relación hacia la tabla 'users'
       let query = supabase
         .from('development_hours')
         .select(`
@@ -66,12 +63,28 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
         `)
         .order('work_date', { ascending: false });
 
-      // ... resto de tus filtros (userRole, fromDate, etc) ...
+      // 2. APLICACIÓN DE FILTROS (Esto es lo que faltaba)
+      // Filtro de Seguridad/Rol
+      if (userRole !== 'admin') {
+        query = query.eq('developer_id', userId);
+      } 
+      // Filtro por Usuario seleccionado (Solo para Admins)
+      else if (selectedDeveloper) {
+        query = query.eq('developer_id', selectedDeveloper);
+      }
+
+      // Filtros de Fecha
+      if (fromDate) {
+        query = query.gte('work_date', fromDate);
+      }
+      if (toDate) {
+        query = query.lte('work_date', toDate);
+      }
 
       const { data, error } = await query;
       if (error) throw error;
 
-      // Ajustamos el mapeo de los datos
+      // 3. Mapeo de datos para usar el nombre real en lugar del ID
       const formattedLogs: WorkLog[] = (data || []).map((log: any) => ({
         id: log.id,
         date: log.work_date,
@@ -79,7 +92,6 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
         hours: parseFloat(log.hours) || 0,
         ticket_id: log.sla_tickets?.ticket_number || '',
         ticket_title: log.sla_tickets?.title || '',
-        // Aquí tomamos el username directamente de la relación con users
         developer_name: log.users?.username || 'Sin usuario', 
       }));
 
@@ -99,32 +111,31 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
   const averageHours = workLogs.length > 0 ? (totalHours / workLogs.length).toFixed(1) : '0';
 
   const exportToCSV = () => {
-  const headers = ['Fecha', 'Ticket', 'Título', 'Usuario', 'Horas', 'Descripción'];
-  const rows = workLogs.map((log) => [
-    log.date,
-    log.ticket_id,
-    log.ticket_title,
-    log.developer_name, // <-- CAMBIO AQUÍ: Antes decía developer_id
-    log.hours,
-    log.description,
-  ]);
+    const headers = ['Fecha', 'Ticket', 'Título', 'Usuario', 'Horas', 'Descripción'];
+    const rows = workLogs.map((log) => [
+      log.date,
+      log.ticket_id,
+      log.ticket_title,
+      log.developer_name, // Ahora usa el nombre real
+      log.hours,
+      log.description,
+    ]);
 
-  const csvContent = [headers, ...rows]
-    .map((row) =>
-      row
-        .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
-        .join(',')
-    )
-    .join('\n');
+    const csvContent = [headers, ...rows]
+      .map((row) =>
+        row
+          .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
+          .join(',')
+      )
+      .join('\n');
 
-  // El resto del código de descarga se mantiene igual...
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-  link.setAttribute('href', url);
-  link.setAttribute('download', `reportes_${new Date().getTime()}.csv`);
-  link.click();
-};
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `reportes_${new Date().getTime()}.csv`);
+    link.click();
+  };
 
   const printReport = () => {
     const printWindow = window.open('', '_blank');
@@ -136,59 +147,15 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
         <head>
           <title>Reporte de Trabajo</title>
           <style>
-            body {
-              font-family: Arial, sans-serif;
-              margin: 20px;
-              color: #333;
-            }
-            h1 {
-              text-align: center;
-              color: #1f2937;
-              border-bottom: 2px solid #3b82f6;
-              padding-bottom: 10px;
-            }
-            .meta {
-              text-align: right;
-              color: #666;
-              margin-bottom: 20px;
-              font-size: 12px;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 20px;
-            }
-            th {
-              background-color: #3b82f6;
-              color: white;
-              padding: 12px;
-              text-align: left;
-              font-weight: bold;
-              border: 1px solid #ddd;
-            }
-            td {
-              padding: 10px 12px;
-              border: 1px solid #ddd;
-            }
-            tr:nth-child(even) {
-              background-color: #f9fafb;
-            }
-            .summary {
-              margin-top: 20px;
-              padding: 15px;
-              background-color: #f0f9ff;
-              border-left: 4px solid #3b82f6;
-              border-radius: 4px;
-            }
-            .summary p {
-              margin: 5px 0;
-              font-weight: bold;
-            }
-            @media print {
-              body {
-                margin: 10px;
-              }
-            }
+            body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+            h1 { text-align: center; color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
+            .meta { text-align: right; color: #666; margin-bottom: 20px; font-size: 12px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { background-color: #3b82f6; color: white; padding: 12px; text-align: left; border: 1px solid #ddd; }
+            td { padding: 10px 12px; border: 1px solid #ddd; }
+            tr:nth-child(even) { background-color: #f9fafb; }
+            .summary { margin-top: 20px; padding: 15px; background-color: #f0f9ff; border-left: 4px solid #3b82f6; border-radius: 4px; }
+            .summary p { margin: 5px 0; font-weight: bold; }
           </style>
         </head>
         <body>
@@ -208,9 +175,7 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
               </tr>
             </thead>
             <tbody>
-              ${workLogs
-                .map(
-                  (log) => `
+              ${workLogs.map((log) => `
                 <tr>
                   <td>${log.date}</td>
                   <td>${log.ticket_id}</td>
@@ -219,15 +184,13 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
                   <td>${log.hours}</td>
                   <td>${log.description}</td>
                 </tr>
-              `
-                )
-                .join('')}
+              `).join('')}
             </tbody>
           </table>
           <div class="summary">
             <p>Total de registros: ${workLogs.length}</p>
             <p>Total de horas: ${totalHours.toFixed(1)}</p>
-            <p>Promedio de horas por registro: ${averageHours}</p>
+            <p>Promedio de horas: ${averageHours}</p>
           </div>
         </body>
       </html>
@@ -253,9 +216,7 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Filtros</h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Desde
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Desde</label>
             <input
               type="date"
               value={fromDate}
@@ -264,9 +225,7 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Hasta
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Hasta</label>
             <input
               type="date"
               value={toDate}
@@ -276,9 +235,7 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
           </div>
           {userRole === 'admin' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Usuarios
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Usuarios</label>
               <select
                 value={selectedDeveloper}
                 onChange={(e) => setSelectedDeveloper(e.target.value)}
@@ -286,9 +243,7 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
               >
                 <option value="">Todos</option>
                 {developers.map((dev) => (
-                  <option key={dev.id} value={dev.id}>
-                    {dev.username}
-                  </option>
+                  <option key={dev.id} value={dev.id}>{dev.username}</option>
                 ))}
               </select>
             </div>
@@ -325,6 +280,7 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
           </div>
         </div>
 
+        {/* Tarjetas de Resumen */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4">
             <p className="text-sm text-blue-600 font-medium">Total de Registros</p>
@@ -349,43 +305,23 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                    Fecha
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                    Ticket
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                    Título
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                    Usuarios
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                    Horas
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">
-                    Descripción
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Fecha</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Ticket</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Título</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Usuarios</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Horas</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Descripción</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {workLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm text-gray-900">{log.date}</td>
-                    <td className="px-6 py-4 text-sm font-medium text-blue-600">
-                      {log.ticket_id}
-                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-blue-600">{log.ticket_id}</td>
                     <td className="px-6 py-4 text-sm text-gray-700">{log.ticket_title}</td>
-                    <td className="px-6 py-4 text-sm text-gray-700">
-                      {log.developer_name}
-                    </td>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                      {log.hours.toFixed(1)}h
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">
-                      {log.description}
-                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-700">{log.developer_name}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{log.hours.toFixed(1)}h</td>
+                    <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">{log.description}</td>
                   </tr>
                 ))}
               </tbody>
