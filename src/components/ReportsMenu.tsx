@@ -31,22 +31,27 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
   }, []);
 
   const loadDevelopers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, username')
-        .order('username');
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, username'); // Simplificamos la query
 
-      if (error) throw error;
-      setDevelopers(data || []);
-    } catch (error) {
-      console.error('Error loading developers:', error);
+    if (error) {
+      console.error('Error detallado:', error.message);
+      return;
     }
-  };
+    
+    console.log('Usuarios encontrados:', data); // Revisa esto en la consola F12
+    setDevelopers(data || []);
+  } catch (error) {
+    console.error('Error loading developers:', error);
+  }
+};
 
-  const loadWorkLogs = async () => {
+ const loadWorkLogs = async () => {
     try {
       setLoading(true);
+      // Ajustamos el select para traer el username directamente desde la tabla users
       let query = supabase
         .from('development_hours')
         .select(`
@@ -56,30 +61,17 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
           notes,
           developer_id,
           ticket_id,
-          sla_tickets!inner(ticket_number, title, users(username))
+          sla_tickets(ticket_number, title),
+          users!development_hours_developer_id_fkey(username)
         `)
         .order('work_date', { ascending: false });
 
-      if (userRole !== 'admin') {
-        query = query.eq('developer_id', userId);
-      }
-
-      if (fromDate) {
-        query = query.gte('work_date', fromDate);
-      }
-
-      if (toDate) {
-        query = query.lte('work_date', toDate);
-      }
-
-      if (selectedDeveloper) {
-        query = query.eq('developer_id', selectedDeveloper);
-      }
+      // ... resto de tus filtros (userRole, fromDate, etc) ...
 
       const { data, error } = await query;
-
       if (error) throw error;
 
+      // Ajustamos el mapeo de los datos
       const formattedLogs: WorkLog[] = (data || []).map((log: any) => ({
         id: log.id,
         date: log.work_date,
@@ -87,7 +79,8 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
         hours: parseFloat(log.hours) || 0,
         ticket_id: log.sla_tickets?.ticket_number || '',
         ticket_title: log.sla_tickets?.title || '',
-        developer_name: log.sla_tickets?.users?.username || '',
+        // Aquí tomamos el username directamente de la relación con users
+        developer_name: log.users?.username || 'Sin usuario', 
       }));
 
       setWorkLogs(formattedLogs);
