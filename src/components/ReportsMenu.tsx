@@ -12,13 +12,24 @@ interface WorkLog {
   developer_name: string;
 }
 
+interface OdooReport {
+  id: string;
+  ticket_id: string;
+  client_name: string;
+  description: string;
+  odoo_number: string;
+  created_at: string;
+}
+
 interface ReportsMenuProps {
   userRole: string;
   userId: string;
 }
 
 export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
+  const [activeReport, setActiveReport] = useState<'work' | 'odoo'>('work');
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
+  const [odooReports, setOdooReports] = useState<OdooReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
@@ -27,8 +38,12 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
 
   useEffect(() => {
     loadDevelopers();
-    loadWorkLogs();
-  }, []);
+    if (activeReport === 'work') {
+      loadWorkLogs();
+    } else {
+      loadOdooReports();
+    }
+  }, [activeReport]);
 
   const loadDevelopers = async () => {
     try {
@@ -47,8 +62,7 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
   const loadWorkLogs = async () => {
     try {
       setLoading(true);
-      
-      // 1. Iniciamos la query con la relación hacia la tabla 'users'
+
       let query = supabase
         .from('development_hours')
         .select(`
@@ -63,17 +77,13 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
         `)
         .order('work_date', { ascending: false });
 
-      // 2. APLICACIÓN DE FILTROS (Esto es lo que faltaba)
-      // Filtro de Seguridad/Rol
       if (userRole !== 'admin') {
         query = query.eq('developer_id', userId);
-      } 
-      // Filtro por Usuario seleccionado (Solo para Admins)
+      }
       else if (selectedDeveloper) {
         query = query.eq('developer_id', selectedDeveloper);
       }
 
-      // Filtros de Fecha
       if (fromDate) {
         query = query.gte('work_date', fromDate);
       }
@@ -84,7 +94,6 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
       const { data, error } = await query;
       if (error) throw error;
 
-      // 3. Mapeo de datos para usar el nombre real en lugar del ID
       const formattedLogs: WorkLog[] = (data || []).map((log: any) => ({
         id: log.id,
         date: log.work_date,
@@ -92,12 +101,47 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
         hours: parseFloat(log.hours) || 0,
         ticket_id: log.sla_tickets?.ticket_number || '',
         ticket_title: log.sla_tickets?.title || '',
-        developer_name: log.users?.username || 'Sin usuario', 
+        developer_name: log.users?.username || 'Sin usuario',
       }));
 
       setWorkLogs(formattedLogs);
     } catch (error) {
       console.error('Error loading work logs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadOdooReports = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('development_hours')
+        .select(`
+          id,
+          work_date,
+          notes,
+          ticket_id,
+          sla_tickets(ticket_number),
+          clients(name)
+        `)
+        .not('notes', 'is', null)
+        .order('work_date', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedReports: OdooReport[] = (data || []).map((report: any) => ({
+        id: report.id,
+        ticket_id: report.sla_tickets?.ticket_number || '',
+        client_name: report.clients?.name || '',
+        description: report.notes || '',
+        odoo_number: '',
+        created_at: report.work_date,
+      }));
+
+      setOdooReports(formattedReports);
+    } catch (error) {
+      console.error('Error loading odoo reports:', error);
     } finally {
       setLoading(false);
     }
@@ -212,6 +256,33 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
 
   return (
     <div className="space-y-6">
+      <div className="bg-white rounded-lg shadow-sm border-b border-gray-200">
+        <div className="flex gap-1 px-6">
+          <button
+            onClick={() => setActiveReport('work')}
+            className={`px-4 py-4 font-medium border-b-2 transition-colors ${
+              activeReport === 'work'
+                ? 'text-blue-600 border-blue-600'
+                : 'text-gray-600 border-transparent hover:text-gray-900'
+            }`}
+          >
+            Reporte de Trabajo
+          </button>
+          <button
+            onClick={() => setActiveReport('odoo')}
+            className={`px-4 py-4 font-medium border-b-2 transition-colors ${
+              activeReport === 'odoo'
+                ? 'text-purple-600 border-purple-600'
+                : 'text-gray-600 border-transparent hover:text-gray-900'
+            }`}
+          >
+            Reporte Odoo
+          </button>
+        </div>
+      </div>
+
+      {activeReport === 'work' && (
+        <div className="space-y-6">
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Filtros</h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -329,6 +400,166 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
           </div>
         )}
       </div>
+        </div>
+      )}
+
+      {activeReport === 'odoo' && (
+        <div className="space-y-6">
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Filtros</h2>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Desde</label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Hasta</label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+          <div className="flex items-end md:col-span-2">
+            <button
+              onClick={() => loadOdooReports()}
+              className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+            >
+              Aplicar Filtros
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-semibold text-gray-900">Reporte Odoo</h2>
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                const headers = ['Ticket', 'Cliente', 'Descripción', 'Número Odoo'];
+                const rows = odooReports.map((report) => [
+                  report.ticket_id,
+                  report.client_name,
+                  report.description,
+                  report.odoo_number || '',
+                ]);
+                const csvContent = [headers, ...rows]
+                  .map((row) =>
+                    row
+                      .map((cell) => `"${String(cell).replace(/"/g, '""')}"`)
+                      .join(',')
+                  )
+                  .join('\n');
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `reporte_odoo_${new Date().getTime()}.csv`);
+                link.click();
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+            >
+              <Download size={18} />
+              Descargar CSV
+            </button>
+            <button
+              onClick={() => {
+                const printWindow = window.open('', '_blank');
+                if (!printWindow) return;
+                const htmlContent = `
+                  <!DOCTYPE html>
+                  <html>
+                    <head>
+                      <title>Reporte Odoo</title>
+                      <style>
+                        body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+                        h1 { text-align: center; color: #1f2937; border-bottom: 2px solid #a855f7; padding-bottom: 10px; }
+                        .meta { text-align: right; color: #666; margin-bottom: 20px; font-size: 12px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th { background-color: #a855f7; color: white; padding: 12px; text-align: left; border: 1px solid #ddd; }
+                        td { padding: 10px 12px; border: 1px solid #ddd; }
+                        tr:nth-child(even) { background-color: #f9fafb; }
+                      </style>
+                    </head>
+                    <body>
+                      <h1>Reporte Odoo</h1>
+                      <div class="meta">
+                        <p>Fecha: ${new Date().toLocaleDateString('es-CL')} ${new Date().toLocaleTimeString('es-CL')}</p>
+                      </div>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Ticket</th>
+                            <th>Cliente</th>
+                            <th>Descripción</th>
+                            <th>Número Odoo</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${odooReports.map((report) => `
+                            <tr>
+                              <td>${report.ticket_id}</td>
+                              <td>${report.client_name}</td>
+                              <td>${report.description}</td>
+                              <td>${report.odoo_number || ''}</td>
+                            </tr>
+                          `).join('')}
+                        </tbody>
+                      </table>
+                    </body>
+                  </html>
+                `;
+                printWindow.document.write(htmlContent);
+                printWindow.document.close();
+                printWindow.focus();
+                setTimeout(() => printWindow.print(), 250);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              <Printer size={18} />
+              Imprimir
+            </button>
+          </div>
+        </div>
+
+        {odooReports.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500">No hay registros que mostrar</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Ticket</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Cliente</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Descripción</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Número Odoo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {odooReports.map((report) => (
+                  <tr key={report.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm font-medium text-blue-600">{report.ticket_id}</td>
+                    <td className="px-6 py-4 text-sm text-gray-700">{report.client_name}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">{report.description}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{report.odoo_number || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+        </div>
+      )}
     </div>
   );
 }

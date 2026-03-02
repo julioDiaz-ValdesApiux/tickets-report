@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Clock, LogOut, Users as UsersIcon, Building2, FileText } from 'lucide-react';
+import { Clock, LogOut } from 'lucide-react';
 import { LoginForm } from './components/LoginForm';
 import { TicketForm } from './components/TicketForm';
 import { TicketList } from './components/TicketList';
 import { UserManagement } from './components/UserManagement';
 import { ClientManagement } from './components/ClientManagement';
 import { ReportsMenu } from './components/ReportsMenu';
+import { NavigationMenu } from './components/NavigationMenu';
 import { supabase } from './lib/supabase';
 
 function App() {
@@ -67,6 +68,12 @@ function App() {
     setRefreshTrigger((prev) => prev + 1);
   };
 
+  const handleNavigation = (view: 'users' | 'clients' | 'reports' | 'tickets') => {
+    setShowUserManagement(view === 'users');
+    setShowClientManagement(view === 'clients');
+    setShowReports(view === 'reports');
+  };
+
   if (!user) {
     return <LoginForm onLoginSuccess={handleLoginSuccess} />;
   }
@@ -95,43 +102,13 @@ function App() {
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => {
-                setShowReports(!showReports);
-                setShowUserManagement(false);
-                setShowClientManagement(false);
-              }}
-              className="flex items-center gap-2 px-4 py-2 text-green-600 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
-            >
-              <FileText size={18} />
-              {showReports ? 'Ver Tickets' : 'Reportes'}
-            </button>
-            {user.role === 'admin' && (
-              <>
-                <button
-                  onClick={() => {
-                    setShowClientManagement(!showClientManagement);
-                    setShowUserManagement(false);
-                    setShowReports(false);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 text-amber-600 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
-                >
-                  <Building2 size={18} />
-                  {showClientManagement ? 'Ver Tickets' : 'Gestión de Clientes'}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowUserManagement(!showUserManagement);
-                    setShowClientManagement(false);
-                    setShowReports(false);
-                  }}
-                  className="flex items-center gap-2 px-4 py-2 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                >
-                  <UsersIcon size={18} />
-                  {showUserManagement ? 'Ver Tickets' : 'Gestión de Usuarios'}
-                </button>
-              </>
-            )}
+            <NavigationMenu
+              showUserManagement={showUserManagement}
+              showClientManagement={showClientManagement}
+              showReports={showReports}
+              onNavigate={handleNavigation}
+              userRole={user.role}
+            />
             <div className="text-right">
               <p className="text-sm text-gray-600">Sesión iniciada como</p>
               <p className="font-semibold text-gray-900">
