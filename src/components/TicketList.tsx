@@ -248,9 +248,7 @@ export function TicketList({ refreshTrigger, userId, userRole }: TicketListProps
 
   useEffect(() => {
     fetchTickets();
-    if (userRole === 'admin') {
-      fetchUsers();
-    }
+    fetchUsers();
   }, [refreshTrigger, userRole]);
 
   useEffect(() => {
@@ -436,7 +434,7 @@ export function TicketList({ refreshTrigger, userId, userRole }: TicketListProps
                 </div>
               </div>
             )}
-            {userRole === 'admin' && (
+            {(userRole === 'admin' || userRole !== 'admin') && (
               <div className="mt-2">
                 {editingUser === ticket.id ? (
                   <div className="flex items-center gap-1">
@@ -460,7 +458,7 @@ export function TicketList({ refreshTrigger, userId, userRole }: TicketListProps
                   </div>
                 ) : (
                   <p className="text-sm text-gray-600">
-                    Asignado a:{' '}
+                    {userRole === 'admin' ? 'Asignado a' : 'Derivar a'}:{' '}
                     <button
                       onClick={() => setEditingUser(ticket.id)}
                       className="font-medium text-blue-600 hover:underline"
