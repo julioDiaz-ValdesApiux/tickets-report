@@ -443,12 +443,16 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
           <div className="flex gap-3">
             <button
               onClick={() => {
-                const headers = ['Ticket', 'Cliente', 'Descripción', 'Número Odoo'];
+                const headers = ['Fecha', 'Código Odoo', 'Cliente', 'Ticket', 'Título', 'Usuario', 'Horas', 'Descripción'];
                 const rows = odooReports.map((report) => [
-                  report.ticket_id,
+                  report.date,
+                  report.odoo_code || '',
                   report.client_name,
+                  report.ticket_id,
+                  report.ticket_title,
+                  report.developer_name,
+                  report.hours.toFixed(1),
                   report.description,
-                  report.odoo_number || '',
                 ]);
                 const csvContent = [headers, ...rows]
                   .map((row) =>
@@ -496,19 +500,27 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
                       <table>
                         <thead>
                           <tr>
-                            <th>Ticket</th>
+                            <th>Fecha</th>
+                            <th>Código Odoo</th>
                             <th>Cliente</th>
+                            <th>Ticket</th>
+                            <th>Título</th>
+                            <th>Usuario</th>
+                            <th>Horas</th>
                             <th>Descripción</th>
-                            <th>Número Odoo</th>
                           </tr>
                         </thead>
                         <tbody>
                           ${odooReports.map((report) => `
                             <tr>
-                              <td>${report.ticket_id}</td>
+                              <td>${report.date}</td>
+                              <td>${report.odoo_code || ''}</td>
                               <td>${report.client_name}</td>
+                              <td>${report.ticket_id}</td>
+                              <td>${report.ticket_title}</td>
+                              <td>${report.developer_name}</td>
+                              <td>${report.hours.toFixed(1)}</td>
                               <td>${report.description}</td>
-                              <td>${report.odoo_number || ''}</td>
                             </tr>
                           `).join('')}
                         </tbody>
@@ -538,19 +550,27 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Ticket</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Fecha</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Código Odoo</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Cliente</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Ticket</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Título</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Usuario</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Horas</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Descripción</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Número Odoo</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {odooReports.map((report) => (
                   <tr key={report.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-blue-600">{report.ticket_id}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{report.date}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-purple-600">{report.odoo_code || '-'}</td>
                     <td className="px-6 py-4 text-sm text-gray-700">{report.client_name}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-blue-600">{report.ticket_id}</td>
+                    <td className="px-6 py-4 text-sm text-gray-700">{report.ticket_title}</td>
+                    <td className="px-6 py-4 text-sm text-gray-700">{report.developer_name}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{report.hours.toFixed(1)}h</td>
                     <td className="px-6 py-4 text-sm text-gray-600 max-w-xs truncate">{report.description}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{report.odoo_number || '-'}</td>
                   </tr>
                 ))}
               </tbody>
