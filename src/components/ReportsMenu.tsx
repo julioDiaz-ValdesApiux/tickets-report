@@ -10,6 +10,7 @@ interface WorkLog {
   ticket_id: string;
   ticket_title: string;
   developer_name: string;
+  client_name: string;
 }
 
 interface OdooReport {
@@ -72,7 +73,7 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
           notes,
           developer_id,
           ticket_id,
-          sla_tickets(ticket_number, title),
+          sla_tickets(ticket_number, title, client_id(name)),
           users!development_hours_developer_id_fkey(username)
         `)
         .order('work_date', { ascending: false });
@@ -102,6 +103,7 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
         ticket_id: log.sla_tickets?.ticket_number || '',
         ticket_title: log.sla_tickets?.title || '',
         developer_name: log.users?.username || 'Sin usuario',
+        client_name: log.sla_tickets?.client_id?.name || '',
       }));
 
       setWorkLogs(formattedLogs);
@@ -155,12 +157,13 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
   const averageHours = workLogs.length > 0 ? (totalHours / workLogs.length).toFixed(1) : '0';
 
   const exportToCSV = () => {
-    const headers = ['Fecha', 'Ticket', 'Título', 'Usuario', 'Horas', 'Descripción'];
+    const headers = ['Fecha', 'Ticket', 'Cliente', 'Título', 'Usuario', 'Horas', 'Descripción'];
     const rows = workLogs.map((log) => [
       log.date,
       log.ticket_id,
+      log.client_name,
       log.ticket_title,
-      log.developer_name, // Ahora usa el nombre real
+      log.developer_name,
       log.hours,
       log.description,
     ]);
@@ -212,6 +215,7 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
               <tr>
                 <th>Fecha</th>
                 <th>Ticket</th>
+                <th>Cliente</th>
                 <th>Título</th>
                 <th>Usuario</th>
                 <th>Horas</th>
@@ -223,6 +227,7 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
                 <tr>
                   <td>${log.date}</td>
                   <td>${log.ticket_id}</td>
+                  <td>${log.client_name}</td>
                   <td>${log.ticket_title}</td>
                   <td>${log.developer_name}</td>
                   <td>${log.hours}</td>
@@ -378,6 +383,7 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Fecha</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Ticket</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Cliente</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Título</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Usuarios</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700">Horas</th>
@@ -389,6 +395,7 @@ export function ReportsMenu({ userRole, userId }: ReportsMenuProps) {
                   <tr key={log.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm text-gray-900">{log.date}</td>
                     <td className="px-6 py-4 text-sm font-medium text-blue-600">{log.ticket_id}</td>
+                    <td className="px-6 py-4 text-sm text-gray-700">{log.client_name}</td>
                     <td className="px-6 py-4 text-sm text-gray-700">{log.ticket_title}</td>
                     <td className="px-6 py-4 text-sm text-gray-700">{log.developer_name}</td>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{log.hours.toFixed(1)}h</td>
